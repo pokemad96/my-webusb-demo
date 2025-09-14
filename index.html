@@ -62,19 +62,39 @@
       }
     }
 
-    function updateDashboard(values) {
-      document.getElementById("tempVal").innerText = values.temp + " °C";
-      document.getElementById("humVal").innerText = values.hum + " %";
-      document.getElementById("batVal").innerText = values.batt + " V";
-      document.getElementById("motionVal").innerText = values.motion ? "Yes" : "No";
-      document.getElementById("lightVal").innerText = values.light + " lux";
+function updateDashboard(packet) {
+  const core = packet.core;
 
-      // Update history
-      historyData.labels.push(new Date().toLocaleTimeString());
-      historyData.temp.push(values.temp);
-      historyData.hum.push(values.hum);
-      if (chart) chart.update();
-    }
+  // Core sensors
+  document.getElementById("tempVal").innerText = core.temp + " °C";
+  document.getElementById("humVal").innerText = core.hum + " %";
+  document.getElementById("batVal").innerText = core.batt + " V";
+  document.getElementById("motionVal").innerText = core.motion ? "Yes" : "No";
+  document.getElementById("lightVal").innerText = core.light + " lux";
+
+  // Dynamic sensor tabs
+  const extraTabs = document.getElementById("extraTabs");
+  extraTabs.innerHTML = ""; // clear and rebuild
+  packet.extra.forEach(sensor => {
+    const div = document.createElement("div");
+    div.className = "sensor-card";
+    div.innerHTML = `
+      <h5>🔎 Sensor ${sensor.id}</h5>
+      <p>Type: ${sensor.type}</p>
+      <p>RSSI: ${sensor.rssi} dBm</p>
+      <p>Last Seen: ${new Date(sensor.last_seen).toLocaleTimeString()}</p>
+      <p>Values: ${JSON.stringify(sensor.values)}</p>
+    `;
+    extraTabs.appendChild(div);
+  });
+
+  // History chart (optional)
+  historyData.labels.push(new Date().toLocaleTimeString());
+  historyData.temp.push(core.temp);
+  historyData.hum.push(core.hum);
+  if (chart) chart.update();
+}
+
 
     function setupHistoryChart() {
       const ctx = document.getElementById("historyChart").getContext("2d");
