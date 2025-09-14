@@ -51,7 +51,7 @@
 
     async function connectDevice() {
       try {
-        device = await navigator.usb.requestDevice({ filters: [{ vendorId: 0x1915 }] }); // Nordic VID
+        device = await navigator.usb.requestDevice({ filters: [{ vendorId: 0x2FE3 }] }); // Nordic VID
         await device.open();
         await device.selectConfiguration(1);
         await device.claimInterface(0);
