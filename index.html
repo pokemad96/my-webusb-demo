@@ -83,6 +83,7 @@
         try {
           const result = await device.transferIn(inEndpoint, 64); // 64 bytes at a time
           if (result.data && result.data.byteLength > 0) {
+            console.log(result)
             const text = new TextDecoder().decode(result.data);
             console.log("RX:", text);
 
@@ -99,6 +100,7 @@
           break;
         }
       }
+      console.log("Device closed");
     }
 
     function updateDashboard(packet) {
