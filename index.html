@@ -1,130 +1,126 @@
 <!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Sensor Dashboard</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    body { padding: 20px; background: #f5f7fa; }
-    .sensor-card { border-radius: 12px; padding: 20px; margin: 10px; background: white; box-shadow: 0 3px 6px rgba(0,0,0,0.1); }
-    .sensor-value { font-size: 2em; font-weight: bold; }
-  </style>
-</head>
+<html lang="en">
+  <head>
+    <title>WebUSB Serial Sample Application</title>
+  </head>
+
 <body>
-  <h1 class="mb-4">🌐 WebUSB Sensor Dashboard</h1>
-  <button id="connect" class="btn btn-primary mb-3">🔌 Connect Device</button>
-
-  <!-- Tabs -->
-  <ul class="nav nav-tabs" id="sensorTabs" role="tablist">
-    <li class="nav-item" role="presentation">
-      <button class="nav-link active" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard" type="button" role="tab">Dashboard</button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history" type="button" role="tab">History</button>
-    </li>
-  </ul>
-
-  <div class="tab-content mt-3">
-    <!-- Dashboard -->
-    <div class="tab-pane fade show active" id="dashboard" role="tabpanel">
-      <div class="row">
-        <div class="col-md-4 sensor-card">🌡️ Temp: <div id="tempVal" class="sensor-value">-- °C</div></div>
-        <div class="col-md-4 sensor-card">💧 Humidity: <div id="humVal" class="sensor-value">-- %</div></div>
-        <div class="col-md-4 sensor-card">🔋 Battery: <div id="batVal" class="sensor-value">-- V</div></div>
-        <div class="col-md-4 sensor-card">🕺 Motion: <div id="motionVal" class="sensor-value">--</div></div>
-        <div class="col-md-4 sensor-card">💡 Light: <div id="lightVal" class="sensor-value">-- lux</div></div>
-      </div>
-      <div id="extraTabs"></div>
-    </div>
-
-    <!-- History -->
-    <div class="tab-pane fade" id="history" role="tabpanel">
-      <canvas id="historyChart" height="100"></canvas>
-    </div>
-  </div>
-
   <script>
-    let device;
-    let chart;
-    let historyData = { labels: [], temp: [], hum: [] };
+var serial = {};
 
-    async function connectDevice() {
-      try {
-        device = await navigator.usb.requestDevice({ filters: [{ vendorId: 0x2FE3 }] }); // Nordic VID
-        await device.open();
-        await device.selectConfiguration(1);
-        await device.claimInterface(0);
-        console.log("Connected:", device.productName);
-        // TODO: Start polling or listening for reports from the device
-      } catch (err) {
-        console.error("USB Error:", err);
-      }
+(function() {
+  'use strict';
+
+  serial.getPorts = function() {
+    return navigator.usb.getDevices().then(devices => {
+      return devices.map(device => new serial.Port(device));
+    });
+  };
+
+  serial.requestPort = function() {
+    const filters = [
+      { 'vendorId': 0x2fe3, 'productId': 0x0100 },
+      { 'vendorId': 0x2fe3, 'productId': 0x00a },
+      { 'vendorId': 0x8086, 'productId': 0xF8A1 },
+    ];
+    return navigator.usb.requestDevice({ 'filters': filters }).then(
+      device => new serial.Port(device)
+    );
+  }
+
+  serial.Port = function(device) {
+    this.device_ = device;
+  };
+
+  serial.Port.prototype.connect = function() {
+    let readLoop = () => {
+      const {
+        endpointNumber
+      } = this.device_.configuration.interfaces[0].alternate.endpoints[0]
+      this.device_.transferIn(endpointNumber, 64).then(result => {
+        this.onReceive(result.data);
+        readLoop();
+      }, error => {
+        this.onReceiveError(error);
+      });
+    };
+
+    return this.device_.open()
+        .then(() => {
+          if (this.device_.configuration === null) {
+            return this.device_.selectConfiguration(1);
+          }
+        })
+        .then(() => this.device_.claimInterface(0))
+        .then(() => {
+          readLoop();
+        });
+  };
+
+  serial.Port.prototype.disconnect = function() {
+    return this.device_.close();
+  };
+
+  serial.Port.prototype.send = function(data) {
+    const {
+      endpointNumber
+    } = this.device_.configuration.interfaces[0].alternate.endpoints[1]
+    return this.device_.transferOut(endpointNumber, data);
+  };
+})();
+
+let port;
+
+function connect() {
+  port.connect().then(() => {
+    port.onReceive = data => {
+      let textDecoder = new TextDecoder();
+      console.log("Received:", textDecoder.decode(data));
+      document.getElementById('output').value += textDecoder.decode(data);
     }
-
-function updateDashboard(packet) {
-  const core = packet.core;
-
-  // Core sensors
-  document.getElementById("tempVal").innerText = core.temp + " °C";
-  document.getElementById("humVal").innerText = core.hum + " %";
-  document.getElementById("batVal").innerText = core.batt + " V";
-  document.getElementById("motionVal").innerText = core.motion ? "Yes" : "No";
-  document.getElementById("lightVal").innerText = core.light + " lux";
-
-  // Dynamic sensor tabs
-  const extraTabs = document.getElementById("extraTabs");
-  extraTabs.innerHTML = ""; // clear and rebuild
-  packet.extra.forEach(sensor => {
-    const div = document.createElement("div");
-    div.className = "sensor-card";
-    div.innerHTML = `
-      <h5>🔎 Sensor ${sensor.id}</h5>
-      <p>Type: ${sensor.type}</p>
-      <p>RSSI: ${sensor.rssi} dBm</p>
-      <p>Last Seen: ${new Date(sensor.last_seen).toLocaleTimeString()}</p>
-      <p>Values: ${JSON.stringify(sensor.values)}</p>
-    `;
-    extraTabs.appendChild(div);
+    port.onReceiveError = error => {
+      console.error(error);
+      document.querySelector("#connect").style = "visibility: initial";
+      port.disconnect();
+    };
   });
-
-  // History chart (optional)
-  historyData.labels.push(new Date().toLocaleTimeString());
-  historyData.temp.push(core.temp);
-  historyData.hum.push(core.hum);
-  if (chart) chart.update();
 }
 
+function send(string) {
+  console.log("sending to serial:" + string.length);
+  if (string.length === 0)
+    return;
+  console.log("sending to serial: [" + string +"]\n");
 
-    function setupHistoryChart() {
-      const ctx = document.getElementById("historyChart").getContext("2d");
-      chart = new Chart(ctx, {
-        type: "line",
-        data: {
-          labels: historyData.labels,
-          datasets: [
-            { label: "Temp (°C)", data: historyData.temp, borderColor: "red" },
-            { label: "Humidity (%)", data: historyData.hum, borderColor: "blue" }
-          ]
-        },
-        options: { responsive: true }
-      });
-    }
+  let view = new TextEncoder('utf-8').encode(string);
+  console.log(view);
+  if (port) {
+    port.send(view);
+  }
+};
 
-    document.getElementById("connect").onclick = () => {
-      connectDevice();
-      setupHistoryChart();
-      // For demo: simulate updates
-      setInterval(() => {
-        updateDashboard({
-          temp: (20 + Math.random()*5).toFixed(1),
-          hum: (50 + Math.random()*10).toFixed(1),
-          batt: (3.7 + Math.random()*0.1).toFixed(2),
-          motion: Math.random() > 0.5,
-          light: (100 + Math.random()*50).toFixed(0)
-        });
-      }, 2000);
-    };
-  </script>
+window.onload = _ => {
+  document.querySelector("#connect").onclick = function() {
+    serial.requestPort().then(selectedPort => {
+      port = selectedPort;
+      this.style = "visibility: hidden";
+      connect();
+    });
+  }
+
+  document.querySelector("#submit").onclick = () => {
+    let source = document.querySelector("#input").value;
+    send(source);
+  }
+}
+
+</script>
+ <button id="connect" style="visibility: initial">Connect To WebUSB Device</button>
+ <br><br><label for="input">Sender: </label> <br>
+ <textarea id="input" rows="25" cols="80">WebUSB!</textarea>
+ <br><button id="submit">Send</button>
+ <br><br>
+ <label for="output">Receiver: </label> <br>
+ <textarea id="output" rows="25" cols="80"></textarea>
 </body>
 </html>
