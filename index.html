@@ -191,9 +191,9 @@ window.onload = _ => {
       const core = packet.core || packet;
 
       // Core sensors
-      document.getElementById("tempVal").innerText = core.temp + " °C";
-      document.getElementById("humVal").innerText = core.hum + " %";
-      document.getElementById("batVal").innerText = core.batt + " V";
+      document.getElementById("tempVal").innerText = (core.temp / 100) + " °C";
+      document.getElementById("humVal").innerText = (core.hum / 100) + " %";
+      document.getElementById("batVal").innerText = (core.batt / 100) + " V";
       document.getElementById("motionVal").innerText = core.motion ? "Yes" : "No";
       document.getElementById("lightVal").innerText = core.light + " lux";
 
