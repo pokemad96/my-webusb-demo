@@ -113,7 +113,8 @@ function connect() {
   port.connect().then(() => {
     port.onReceive = data => {
       let textDecoder = new TextDecoder();
-      console.log("Received:", textDecoder.decode(data));
+      let text = textDecoder.decode(data);
+      console.log("Received:", text);
       // 🔹 Expect JSON packets from firmware
       try {
         const packet = JSON.parse(text);
