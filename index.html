@@ -90,14 +90,15 @@
         while ((newlineIndex = buffer.indexOf("\n")) >= 0) {
           const jsonStr = buffer.slice(0, newlineIndex).trim();
           buffer = buffer.slice(newlineIndex + 1);
-
+    
           if (jsonStr.length > 0) {
-            try {
-              const packet = JSON.parse(jsonStr);
-              this.onReceive(packet);   // parsed object
-            } catch (e) {
-              console.warn("Invalid JSON chunk:", jsonStr);
-            }
+            this.onReceive(jsonStr);
+            // try {
+            //   const packet = JSON.parse(jsonStr);
+            //   this.onReceive(packet);   // parsed object
+            // } catch (e) {
+            //   console.warn("Invalid JSON chunk:", jsonStr);
+            // }
           }
         }
       } catch (e) {
