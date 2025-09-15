@@ -140,12 +140,12 @@ let port;
 function connect() {
   port.connect().then(() => {
     port.onReceive = data => {
-      let textDecoder = new TextDecoder();
-      let text = textDecoder.decode(data);
-      console.log("Received:", text);
+      // let textDecoder = new TextDecoder();
+      // let text = textDecoder.decode(data);
+      console.log("Received:", data);
       // 🔹 Expect JSON packets from firmware
       try {
-        const packet = JSON.parse(text);
+        const packet = JSON.parse(data);
         updateDashboard(packet);
       } catch (e) {
         console.warn("Non-JSON or partial packet:", text);
