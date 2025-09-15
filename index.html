@@ -148,7 +148,7 @@ function connect() {
         const packet = JSON.parse(data);
         updateDashboard(packet);
       } catch (e) {
-        console.warn("Non-JSON or partial packet:", text);
+        console.warn("Non-JSON or partial packet:", data);
       }
     }
     port.onReceiveError = error => {
