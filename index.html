@@ -114,7 +114,13 @@ function connect() {
     port.onReceive = data => {
       let textDecoder = new TextDecoder();
       console.log("Received:", textDecoder.decode(data));
-      document.getElementById('output').value += textDecoder.decode(data);
+      // 🔹 Expect JSON packets from firmware
+      try {
+        const packet = JSON.parse(text);
+        updateDashboard(packet);
+      } catch (e) {
+        console.warn("Non-JSON or partial packet:", text);
+      }
     }
     port.onReceiveError = error => {
       console.error(error);
