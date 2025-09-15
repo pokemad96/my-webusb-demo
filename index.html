@@ -71,17 +71,44 @@
   };
 
   serial.Port.prototype.connect = function() {
-    let readLoop = () => {
-      const {
-        endpointNumber
-      } = this.device_.configuration.interfaces[0].alternate.endpoints[0]
-      this.device_.transferIn(endpointNumber, 64).then(result => {
-        this.onReceive(result.data);
-        readLoop();
-      }, error => {
-        this.onReceiveError(error);
-      });
-    };
+      let buffer = "";  // holds incomplete message parts
+
+  const readLoop = () => {
+    const { endpointNumber } =
+      this.device_.configuration.interfaces[0].alternate.endpoints[0];
+
+    this.device_.transferIn(endpointNumber, 64).then(result => {
+      const text = new TextDecoder().decode(result.data);
+
+      // Append to buffer
+      buffer += text;
+
+      try {
+        // Try to parse full JSON objects out of the buffer
+        // We assume each JSON object ends with '\n'
+        let newlineIndex;
+        while ((newlineIndex = buffer.indexOf("\n")) >= 0) {
+          const jsonStr = buffer.slice(0, newlineIndex).trim();
+          buffer = buffer.slice(newlineIndex + 1);
+
+          if (jsonStr.length > 0) {
+            try {
+              const packet = JSON.parse(jsonStr);
+              this.onReceive(packet);   // parsed object
+            } catch (e) {
+              console.warn("Invalid JSON chunk:", jsonStr);
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Parse error:", e);
+      }
+
+      readLoop(); // keep going
+    }, error => {
+      this.onReceiveError(error);
+    });
+  };
 
     return this.device_.open()
         .then(() => {
